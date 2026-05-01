@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#080808"/>
+<title>HeyMax Logo Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080808;--panel:#0c0c0c;--border:#181818;--border2:#111;
+  --text:#888;--text2:#555;--text3:#333;--accent:#6E1FFF;--teal:#00E3FD;
+  --mono:'DM Mono',monospace;--sans:'Plus Jakarta Sans',sans-serif;
+  --panel-h:320px;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);touch-action:none}
+#root{width:100%;height:100%;display:flex;flex-direction:column}
+
+/* Canvas area */
+.canvas-wrap{flex:1;position:relative;overflow:hidden;min-height:0}
+.canvas-wrap canvas{display:block;width:100%!important;height:100%!important}
+
+/* Bottom sheet (mobile) */
+.sheet{
+  background:var(--panel);
+  border-top:1px solid var(--border);
+  flex-shrink:0;
+  display:flex;flex-direction:column;
+  transition:height 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.sheet-handle{
+  width:100%;padding:10px 0 0;display:flex;justify-content:center;align-items:center;
+  cursor:pointer;flex-shrink:0;
+}
+.sheet-pill{width:36px;height:4px;border-radius:2px;background:var(--border2)}
+
+/* Tabs */
+.tabs{display:flex;padding:0 16px;gap:2px;flex-shrink:0;border-bottom:1px solid var(--border2)}
+.tab{
+  flex:1;padding:10px 4px;font-family:var(--mono);font-size:9px;letter-spacing:0.14em;
+  text-transform:uppercase;color:var(--text3);background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;transition:color 0.15s,border-color 0.15s;
+  white-space:nowrap;
+}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+
+/* Tab content */
+.tab-content{flex:1;overflow-y:auto;padding:16px 16px 24px;-webkit-overflow-scrolling:touch}
+.tab-content::-webkit-scrollbar{display:none}
+
+/* Desktop sidebar */
+@media(min-width:768px){
+  #root{flex-direction:row}
+  .canvas-wrap{flex:1}
+  .sheet{
+    width:280px;flex-shrink:0;height:100%!important;
+    border-top:none;border-left:1px solid var(--border);
+    flex-direction:column;
+  }
+  .sheet-handle{display:none}
+  .tabs{padding:20px 16px 0;flex-direction:column;border-bottom:none;border-right:none;gap:2px}
+  .tab{flex:none;text-align:left;padding:8px 10px;border-bottom:none;border-left:2px solid transparent}
+  .tab.active{border-bottom:none;border-left-color:var(--accent)}
+  .tab-content{padding:16px 16px 32px}
+}
+
+/* Controls */
+.label{font-family:var(--mono);font-size:8px;letter-spacing:0.2em;color:var(--text3);text-transform:uppercase;margin-bottom:10px;display:block}
+.sublabel{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:#1e1e1e;text-transform:uppercase;margin-bottom:6px;margin-top:12px}
+.hr{border:none;border-top:1px solid var(--border2);margin:14px 0}
+
+/* Slider */
+.slider-row{margin-bottom:16px}
+.slider-header{display:flex;justify-content:space-between;margin-bottom:6px}
+.slider-lbl{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;color:var(--text3);text-transform:uppercase}
+.slider-val{font-family:var(--mono);font-size:9px;color:#555}
+input[type=range]{width:100%;height:2px;accent-color:var(--accent);cursor:pointer}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.toggle-lbl{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase}
+.toggle-track{
+  width:38px;height:22px;border-radius:11px;cursor:pointer;position:relative;
+  transition:background 0.2s,border 0.2s;flex-shrink:0;border:1px solid;
+}
+.toggle-thumb{
+  position:absolute;top:3px;width:14px;height:14px;border-radius:50%;
+  transition:left 0.2s,background 0.2s;
+}
+
+/* Color grid */
+.color-section{margin-bottom:18px}
+.panel-label{
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+}
+.panel-tag{font-family:var(--mono);font-size:8px;letter-spacing:0.14em;color:var(--text3);text-transform:uppercase}
+.panel-preview{flex:1;height:4px;border-radius:2px;border:1px solid var(--border2)}
+.edge-row{display:flex;gap:8px;margin-bottom:10px}
+.edge-block{flex:1}
+.edge-label{font-family:var(--mono);font-size:7px;letter-spacing:0.12em;color:#2a2a2a;text-transform:uppercase;margin-bottom:5px}
+.color-btn{
+  width:100%;height:36px;border-radius:6px;border:1.5px solid transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:8px;letter-spacing:0.08em;transition:border-color 0.12s;
+}
+.color-btn.selected{border-color:rgba(255,255,255,0.6)}
+.color-btn:active{transform:scale(0.96)}
+
+/* Color picker modal */
+.modal-overlay{
+  position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.85);
+  display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+@media(min-width:768px){.modal-overlay{align-items:center}}
+.modal-box{
+  background:#0e0e0e;border-radius:16px 16px 0 0;border:1px solid var(--border);
+  padding:20px 16px 32px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto;
+}
+@media(min-width:768px){.modal-box{border-radius:12px;padding:20px;max-height:60vh}}
+.modal-title{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;color:var(--text3);text-transform:uppercase;margin-bottom:16px}
+.modal-group-label{font-family:var(--mono);font-size:7px;letter-spacing:0.16em;color:#2a2a2a;text-transform:uppercase;margin-bottom:8px;margin-top:14px}
+.color-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.color-swatch{
+  aspect-ratio:1;border-radius:6px;cursor:pointer;border:2px solid transparent;
+  transition:transform 0.1s,border-color 0.1s;
+}
+.color-swatch:active{transform:scale(0.88)}
+.color-swatch.selected{border-color:rgba(255,255,255,0.7)}
+
+/* Preset row */
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.preset-btn{
+  height:52px;border-radius:10px;border:1.5px solid transparent;cursor:pointer;
+  position:relative;overflow:hidden;transition:border-color 0.12s,transform 0.1s;
+}
+.preset-btn:active{transform:scale(0.96)}
+.preset-btn.active{border-color:rgba(255,255,255,0.5)}
+.preset-name{
+  position:absolute;bottom:5px;left:8px;
+  font-family:var(--mono);font-size:7px;letter-spacing:0.1em;text-transform:uppercase;
+  color:rgba(255,255,255,0.6);mix-blend-mode:overlay;
+}
+
+/* BG switch */
+.bg-switch{display:flex;background:#0a0a0a;border-radius:6px;padding:3px;gap:2px;margin-bottom:14px}
+.bg-opt{flex:1;padding:6px 0;font-family:var(--mono);font-size:9px;letter-spacing:0.08em;border:none;cursor:pointer;border-radius:4px;transition:all 0.15s}
+
+/* Export */
+.export-btn{
+  width:100%;padding:12px;border-radius:8px;border:1px solid var(--border);
+  background:transparent;font-family:var(--mono);font-size:9px;letter-spacing:0.16em;
+  text-transform:uppercase;cursor:pointer;color:var(--text2);margin-bottom:10px;
+  transition:color 0.15s,border-color 0.15s;
+}
+.export-btn:hover{color:var(--text);border-color:var(--text3)}
+.export-btn:active{transform:scale(0.98)}
+.export-btn.primary{border-color:var(--accent);color:#9060ff}
+
+/* Canvas info overlay */
+.canvas-info{
+  position:absolute;top:16px;left:16px;pointer-events:none;
+}
+.canvas-badge{
+  font-family:var(--mono);font-size:8px;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(255,255,255,0.2);
+}
+.anim-dot{
+  display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);
+  margin-right:6px;vertical-align:middle;animation:pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Export preview overlay */
+.export-overlay{
+  position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.95);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;
+}
+.export-preview{max-width:100%;max-height:55vh;border-radius:8px;border:1px solid var(--border)}
+.export-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.export-link{
+  font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--text);text-decoration:none;border:1px solid var(--border);border-radius:6px;
+  padding:10px 20px;background:var(--panel);
+}
+.export-close{font-family:var(--mono);font-size:8px;letter-spacing:0.16em;color:var(--text3);text-transform:uppercase;cursor:pointer;margin-top:4px}
+
+/* Loading */
+.loading{
+  position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;z-index:300;
+}
+.loading-logo{font-family:var(--sans);font-size:32px;color:var(--text3)}
+.loading-logo b{font-weight:700;color:var(--text2)}
+.loading-bar{width:120px;height:1px;background:var(--border)}
+.loading-fill{height:100%;background:var(--accent);width:0%;transition:width 0.3s}
+.loading-text{font-family:var(--mono);font-size:8px;letter-spacing:0.2em;color:var(--text3);text-transform:uppercase}
+
+/* Dual slider */
+.dual-track{position:relative;height:22px;margin-bottom:4px;cursor:ew-resize}
+.dual-base{position:absolute;top:50%;transform:translateY(-50%);left:0;right:0;height:2px;background:#1a1a1a;border-radius:1px}
+.dual-fill{position:absolute;top:50%;transform:translateY(-50%);height:2px;background:var(--accent);border-radius:1px;pointer-events:none}
+.dual-handle{
+  position:absolute;top:50%;transform:translate(-50%,-50%);
+  width:16px;height:16px;border-radius:50%;cursor:ew-resize;
+  touch-action:none;transition:transform 0.1s;
+}
+.dual-handle:hover{transform:translate(-50%,-50%) scale(1.2)}
+.dual-handle.lo{background:#3a3a3a;border:2px solid #666}
+.dual-handle.hi{background:var(--accent);border:2px solid #9060ff}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ═══════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════
+const PALETTE = [
+  { group:"Brand",   colors:["#F3EAFF","#D8C1FF","#6E1FFF","#4000B8","#21005E"] },
+  { group:"Teal",    colors:["#D6FBFF","#C0FAFF","#00E3FD","#02818E","#015C65"] },
+  { group:"Pink",    colors:["#FDF0FA","#F498D9","#D812A6","#720E57","#4A0939"] },
+  { group:"Yellow",  colors:["#FFF6BE","#FFEE8F","#FBE043","#F8CB00","#292200"] },
+  { group:"Neutral", colors:["#FFFFFF","#E9E8EB","#C9C4D4","#514C56","#1A1A1A"] },
+];
+const ALL_COLORS = PALETTE.flatMap(g => g.colors);
+
+const PRESETS = [
+  { name:"Aurora",  colors:["#C0FAFF","#00E3FD","#00E3FD","#6E1FFF","#6E1FFF","#D8C1FF","#D8C1FF","#F498D9"], bg:"black" },
+  { name:"Galaxy",  colors:["#21005E","#4000B8","#4000B8","#6E1FFF","#6E1FFF","#D8C1FF","#D8C1FF","#F3EAFF"], bg:"black" },
+  { name:"Sunrise", colors:["#FFF6BE","#FBE043","#FBE043","#F498D9","#F498D9","#D812A6","#D812A6","#4A0939"], bg:"white" },
+  { name:"Ocean",   colors:["#D6FBFF","#C0FAFF","#C0FAFF","#00E3FD","#00E3FD","#02818E","#02818E","#015C65"], bg:"black" },
+  { name:"Mono",    colors:["#FFFFFF","#C9C4D4","#C9C4D4","#514C56","#514C56","#1A1A1A","#1A1A1A","#1A1A1A"], bg:"black" },
+  { name:"Violet",  colors:["#F3EAFF","#D8C1FF","#D8C1FF","#6E1FFF","#6E1FFF","#4000B8","#4000B8","#21005E"], bg:"black" },
+];
+
+const BG_OPTS = [
+  { value:"black", color:"#080808", label:"Black" },
+  { value:"grey",  color:"#888888", label:"Grey"  },
+  { value:"white", color:"#f0f0f0", label:"White" },
+];
+
+const ANIM_PALETTE = ["#C0FAFF","#00E3FD","#6E1FFF","#D8C1FF","#F498D9","#FBE043","#4000B8","#02818E","#D812A6","#21005E"];
+
+// ═══════════════════════════════════════════
+// THREE.JS HELPERS
+// ═══════════════════════════════════════════
+function makeGradTex(cA, cB) {
+  const cv = document.createElement("canvas"); cv.width=512; cv.height=4;
+  const ctx = cv.getContext("2d");
+  const g = ctx.createLinearGradient(0,0,512,0);
+  g.addColorStop(0, cA); g.addColorStop(1, cB);
+  ctx.fillStyle=g; ctx.fillRect(0,0,512,4);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return t;
+}
+
+function remapUVs(geo, axis, u0, u1) {
+  const pos=geo.attributes.position, uvs=new Float32Array(pos.count*2);
+  let mn=Infinity, mx=-Infinity;
+  for(let i=0;i<pos.count;i++){const d=axis===0?pos.getX(i):pos.getY(i);if(d<mn)mn=d;if(d>mx)mx=d;}
+  const dR=mx-mn||1;
+  for(let i=0;i<pos.count;i++){const d=axis===0?pos.getX(i):pos.getY(i);uvs[i*2]=u0+((d-mn)/dR)*(u1-u0);uvs[i*2+1]=0.5;}
+  geo.setAttribute("uv",new THREE.BufferAttribute(uvs,2));
+}
+
+function roundedRect(w,h,r){
+  const s=new THREE.Shape();
+  const sr=Math.min(r,w/2-0.01,h/2-0.01);
+  s.moveTo(-w/2+sr,-h/2);s.lineTo(w/2-sr,-h/2);
+  s.quadraticCurveTo(w/2,-h/2,w/2,-h/2+sr);s.lineTo(w/2,h/2-sr);
+  s.quadraticCurveTo(w/2,h/2,w/2-sr,h/2);s.lineTo(-w/2+sr,h/2);
+  s.quadraticCurveTo(-w/2,h/2,-w/2,h/2-sr);s.lineTo(-w/2,-h/2+sr);
+  s.quadraticCurveTo(-w/2,-h/2,-w/2+sr,-h/2);
+  return s;
+}
+
+function tiltedPanel(w,h,r,center,xA,yA,mat,uvAxis,u0,u1){
+  const geo=new THREE.ShapeGeometry(roundedRect(w,h,r),48);
+  remapUVs(geo,uvAxis,u0,u1);
+  const mesh=new THREE.Mesh(geo,mat);
+  const zA=new THREE.Vector3().crossVectors(xA,yA).normalize();
+  const m4=new THREE.Matrix4();
+  m4.makeBasis(xA.clone().normalize(),yA.clone().normalize(),zA);
+  m4.setPosition(center); mesh.matrix.copy(m4); mesh.matrixAutoUpdate=false;
+  return mesh;
+}
+
+function buildShape(group,{spacing,length,plateWidth,angle,radius,panelColors}){
+  const dead=[];
+  group.traverse(o=>{if(o.isMesh)dead.push(o);});
+  dead.forEach(o=>{o.geometry.dispose();if(o.material?.map)o.material.map.dispose();o.material?.dispose();group.remove(o);});
+  const H=spacing/2,W=plateWidth/2,R=radius;
+  const Ht=(Math.min(angle,90)/90)*plateWidth*0.98;
+  const slant=Math.sqrt(Ht*Ht+H*H);
+  const pm=(a,b)=>new THREE.MeshBasicMaterial({map:makeGradTex(a,b),side:THREE.DoubleSide});
+  const [cAB,cDC,cDC2,cEF,cEF2,cGH,cGH2,cJI]=panelColors;
+  // R1
+  const g1=new THREE.ShapeGeometry(roundedRect(plateWidth,length,R),48);
+  remapUVs(g1,0,0,1);
+  const m1=new THREE.Mesh(g1,pm(cAB,cDC));m1.rotation.x=-Math.PI/2;m1.position.y=H;group.add(m1);
+  // R2
+  group.add(tiltedPanel(length,slant,R,new THREE.Vector3(W-Ht/2,H/2,0),
+    new THREE.Vector3(0,0,1),new THREE.Vector3(-Ht,-H,0).normalize(),pm(cDC2,cEF),1,0,1));
+  // R3
+  group.add(tiltedPanel(length,slant,R,new THREE.Vector3(W-Ht/2,-H/2,0),
+    new THREE.Vector3(0,0,1),new THREE.Vector3(Ht,-H,0).normalize(),pm(cEF2,cGH),1,0,1));
+  // R4
+  const g4=new THREE.ShapeGeometry(roundedRect(plateWidth,length,R),48);
+  remapUVs(g4,0,0,1);
+  const m4=new THREE.Mesh(g4,pm(cGH2,cJI));m4.rotation.x=-Math.PI/2;m4.position.y=-H;group.add(m4);
+}
+
+// ═══════════════════════════════════════════
+// UI PRIMITIVES
+// ═══════════════════════════════════════════
+function Toggle({label,value,onChange,accent="#6E1FFF"}){
+  return(
+    <div className="toggle-row">
+      <span className="toggle-lbl" style={{color:value?"#888":"#444"}}>{label}</span>
+      <div className="toggle-track" onClick={()=>onChange(!value)}
+        style={{background:value?accent:"#111",borderColor:value?accent:"#222"}}>
+        <div className="toggle-thumb" style={{left:value?19:3,background:value?"#fff":"#333"}}/>
+      </div>
+    </div>
+  );
+}
+
+function SliderRow({label,value,min,max,step,unit="",onChange}){
+  const fmt=v=>unit==="°"?Math.round(v)+"°":typeof v==="number"?v.toFixed(2):v;
+  return(
+    <div className="slider-row">
+      <div className="slider-header">
+        <span className="slider-lbl">{label}</span>
+        <span className="slider-val">{fmt(value)}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(parseFloat(e.target.value))}/>
+    </div>
+  );
+}
+
+function DualSlider({label,absMin,absMax,step,lo,hi,onLo,onHi,unit=""}){
+  const trackRef=useRef(null);
+  const dragging=useRef(null);
+  const pLo=((lo-absMin)/(absMax-absMin))*100;
+  const pHi=((hi-absMin)/(absMax-absMin))*100;
+  const snap=v=>Math.round(v/step)*step;
+  const posToVal=useCallback(cx=>{
+    const r=trackRef.current.getBoundingClientRect();
+    const t=Math.max(0,Math.min(1,(cx-r.left)/r.width));
+    return snap(absMin+t*(absMax-absMin));
+  },[absMin,absMax,step]);
+  const move=useCallback(e=>{
+    if(!dragging.current)return;
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    const v=posToVal(cx);
+    if(dragging.current==="lo")onLo(Math.min(v,hi-step));
+    else onHi(Math.max(v,lo+step));
+  },[lo,hi,step,posToVal,onLo,onHi]);
+  const up=useCallback(()=>{
+    dragging.current=null;
+    window.removeEventListener("pointermove",move);
+    window.removeEventListener("pointerup",up);
+    window.removeEventListener("touchmove",move);
+    window.removeEventListener("touchend",up);
+  },[move]);
+  const down=(h)=>(e)=>{
+    e.preventDefault();
+    dragging.current=h;
+    window.addEventListener("pointermove",move);
+    window.addEventListener("pointerup",up);
+  };
+  const fmt=v=>unit==="°"?Math.round(v)+"°":v.toFixed(2);
+  return(
+    <div className="slider-row">
+      <div className="slider-header">
+        <span className="slider-lbl">{label}</span>
+        <span className="slider-val">{fmt(lo)}<span style={{color:"#282828"}}> – </span>{fmt(hi)}</span>
+      </div>
+      <div ref={trackRef} className="dual-track">
+        <div className="dual-base"/>
+        <div className="dual-fill" style={{left:`${pLo}%`,width:`${pHi-pLo}%`}}/>
+        <div className="dual-handle lo" style={{left:`${pLo}%`}} onPointerDown={down("lo")}/>
+        <div className="dual-handle hi" style={{left:`${pHi}%`}} onPointerDown={down("hi")}/>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// COLOR PICKER MODAL
+// ═══════════════════════════════════════════
+function ColorModal({title,current,onSelect,onClose}){
+  return(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e=>e.stopPropagation()}>
+        <div className="modal-title">{title}</div>
+        {PALETTE.map(({group,colors})=>(
+          <div key={group}>
+            <div className="modal-group-label">{group}</div>
+            <div className="color-grid">
+              {colors.map(c=>(
+                <div key={c} className={`color-swatch${current===c?" selected":""}`}
+                  style={{background:c}}
+                  onClick={()=>{onSelect(c);onClose();}}/>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div style={{marginTop:16,textAlign:"center"}}>
+          <button onClick={onClose} style={{fontFamily:"var(--mono)",fontSize:9,letterSpacing:"0.14em",
+            textTransform:"uppercase",color:"var(--text3)",background:"none",border:"none",cursor:"pointer"}}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PANEL COLOR EDITOR
+// ═══════════════════════════════════════════
+function ColorEditor({panelColors,onChange}){
+  const [modal,setModal]=useState(null);
+  const [cAB,cDC,cDC2,cEF,cEF2,cGH,cGH2,cJI]=panelColors;
+  const panels=[
+    {id:"R1",ea:"ab",eb:"dc",a:cAB,b:cDC,ia:0,ib:1},
+    {id:"R2",ea:"dc",eb:"ef",a:cDC2,b:cEF,ia:2,ib:3},
+    {id:"R3",ea:"ef",eb:"gh",a:cEF2,b:cGH,ia:4,ib:5},
+    {id:"R4",ea:"gh",eb:"ji",a:cGH2,b:cJI,ia:6,ib:7},
+  ];
+  const setColor=(i,c)=>{const n=[...panelColors];n[i]=c;onChange(n);};
+  const isLight=hex=>{
+    const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+    return 0.299*r+0.587*g+0.114*b>140;
+  };
+  return(
+    <>
+      {panels.map(({id,ea,eb,a,b,ia,ib})=>(
+        <div key={id} className="color-section">
+          <div className="panel-label">
+            <span className="panel-tag">{id}</span>
+            <div className="panel-preview" style={{background:`linear-gradient(90deg,${a},${b})`}}/>
+          </div>
+          <div className="edge-row">
+            <div className="edge-block">
+              <div className="edge-label">[{ea}]</div>
+              <div className="color-btn" style={{background:a,color:isLight(a)?"#111":"#fff"}}
+                onClick={()=>setModal({i:ia,label:`${id} · [${ea}]`})}>
+                {a.toUpperCase()}
+              </div>
+            </div>
+            <div className="edge-block">
+              <div className="edge-label">[{eb}]</div>
+              <div className="color-btn" style={{background:b,color:isLight(b)?"#111":"#fff"}}
+                onClick={()=>setModal({i:ib,label:`${id} · [${eb}]`})}>
+                {b.toUpperCase()}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+      <button onClick={()=>{
+        const r=[...panelColors].reverse();onChange(r);
+      }} style={{width:"100%",fontFamily:"var(--mono)",fontSize:9,letterSpacing:"0.1em",
+        textTransform:"uppercase",color:"var(--text3)",background:"none",
+        border:"1px solid var(--border)",borderRadius:6,padding:"8px 0",cursor:"pointer",marginTop:4}}>
+        ↔ Reverse
+      </button>
+      {modal&&<ColorModal title={modal.label} current={panelColors[modal.i]}
+        onSelect={c=>setColor(modal.i,c)} onClose={()=>setModal(null)}/>}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PRESETS TAB
+// ═══════════════════════════════════════════
+function PresetsTab({panelColors,onApply,bg,onBg}){
+  const gradCSS=colors=>`linear-gradient(135deg,${colors[0]},${colors[3]},${colors[6]})`;
+  return(
+    <>
+      <span className="label">Presets</span>
+      <div className="preset-grid">
+        {PRESETS.map((p,i)=>(
+          <div key={p.name} className="preset-btn"
+            style={{background:gradCSS(p.colors)}}
+            onClick={()=>onApply(p)}>
+            <span className="preset-name">{p.name}</span>
+          </div>
+        ))}
+      </div>
+      <hr className="hr"/>
+      <span className="label">Background</span>
+      <div className="bg-switch">
+        {BG_OPTS.map(o=>(
+          <button key={o.value} className="bg-opt" onClick={()=>onBg(o.value)}
+            style={{
+              background:bg===o.value?o.color:"transparent",
+              color:bg===o.value?(o.value==="white"?"#111":o.value==="grey"?"#fff":"#888"):"#333",
+              border:"none",
+            }}>{o.label}</button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// SHAPE TAB
+// ═══════════════════════════════════════════
+function ShapeTab({spacing,setSpacing,length,setLength,plateWidth,setPlateWidth,angle,setAngle,radius,setRadius,rotX,setRotX,rotY,setRotY,rotZ,setRotZ}){
+  return(
+    <>
+      <span className="label">Panels</span>
+      <SliderRow label="Spacing"     value={spacing}    min={0.4}  max={6}    step={0.05} onChange={setSpacing}/>
+      <SliderRow label="Length"      value={length}     min={2.70} max={3.25} step={0.05} onChange={setLength}/>
+      <SliderRow label="Plate Width" value={plateWidth} min={4.30} max={5.20} step={0.05} onChange={setPlateWidth}/>
+      <SliderRow label="Angle"       value={angle}      min={0}    max={90}   step={1}    unit="°" onChange={setAngle}/>
+      <SliderRow label="Radius"      value={radius}     min={0.3}  max={0.9}  step={0.01} onChange={setRadius}/>
+      <hr className="hr"/>
+      <span className="label">Rotation</span>
+      <SliderRow label="X" value={rotX} min={-180} max={180} step={1} unit="°" onChange={setRotX}/>
+      <SliderRow label="Y" value={rotY} min={-180} max={180} step={1} unit="°" onChange={setRotY}/>
+      <SliderRow label="Z" value={rotZ} min={-180} max={180} step={1} unit="°" onChange={setRotZ}/>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// ANIMATION TAB
+// ═══════════════════════════════════════════
+function AnimTab({animOn,setAnimOn,mouseOn,setMouseOn,animSpeed,setAnimSpeed,animRef,
+  aniSpacing,setAniSpacing,aniAngle,setAniAngle,aniWidth,setAniWidth,aniLength,setAniLength}){
+  return(
+    <>
+      <Toggle label="Animate" value={animOn} onChange={v=>{setAnimOn(v);animRef.current.on=v;}} accent="#6E1FFF"/>
+      <Toggle label="Mouse / Touch Parallax" value={mouseOn} onChange={v=>{setMouseOn(v);animRef.current.mouse=v;}} accent="#02818E"/>
+      {animOn&&(
+        <>
+          <hr className="hr"/>
+          <SliderRow label="Speed" value={animSpeed} min={0.05} max={2} step={0.05}
+            onChange={v=>{setAnimSpeed(v);animRef.current.speed=v;}}/>
+          <span className="sublabel">Param ranges</span>
+          <DualSlider label="Spacing"     absMin={0.4}  absMax={6}    step={0.05}
+            lo={aniSpacing[0]} hi={aniSpacing[1]} onLo={v=>setAniSpacing([v,aniSpacing[1]])} onHi={v=>setAniSpacing([aniSpacing[0],v])}/>
+          <DualSlider label="Angle"       absMin={0}    absMax={90}   step={1}    unit="°"
+            lo={aniAngle[0]}   hi={aniAngle[1]}   onLo={v=>setAniAngle([v,aniAngle[1]])}     onHi={v=>setAniAngle([aniAngle[0],v])}/>
+          <DualSlider label="Plate Width" absMin={4.3}  absMax={5.2}  step={0.05}
+            lo={aniWidth[0]}   hi={aniWidth[1]}   onLo={v=>setAniWidth([v,aniWidth[1]])}     onHi={v=>setAniWidth([aniWidth[0],v])}/>
+          <DualSlider label="Length"      absMin={2.70} absMax={3.25} step={0.05}
+            lo={aniLength[0]}  hi={aniLength[1]}  onLo={v=>setAniLength([v,aniLength[1]])}   onHi={v=>setAniLength([aniLength[0],v])}/>
+        </>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// EXPORT TAB
+// ═══════════════════════════════════════════
+function ExportTab({onExport,exportImg,onCloseExport,spec}){
+  return(
+    <>
+      <span className="label">Export</span>
+      <button className="export-btn primary" onClick={onExport}>↓ Capture</button>
+      {exportImg&&(
+        <div className="export-overlay" onClick={onCloseExport}>
+          <img className="export-preview" src={exportImg.png} alt="preview" onClick={e=>e.stopPropagation()}/>
+          <div className="export-actions" onClick={e=>e.stopPropagation()}>
+            <a className="export-link" href={exportImg.pngUrl} download="heymax-logo.png">↓ PNG</a>
+            <a className="export-link" href={exportImg.svgUrl} download="heymax-logo.svg">↓ SVG</a>
+            <a className="export-link" href={exportImg.jsonUrl} download="heymax-logo.json">↓ JSON</a>
+          </div>
+          <div className="export-close" onClick={onCloseExport}>tap outside to close</div>
+        </div>
+      )}
+      {spec&&(
+        <>
+          <hr className="hr"/>
+          <span className="label">Parameters</span>
+          {[
+            ["Spacing",    spec.shape.spacing],
+            ["Length",     spec.shape.length],
+            ["Width",      spec.shape.plateWidth],
+            ["Angle",      spec.shape.angle+"°"],
+            ["Radius",     spec.shape.radius],
+            ["Rot X",      spec.rotation.x+"°"],
+            ["Rot Y",      spec.rotation.y+"°"],
+            ["Background", spec.background],
+          ].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{fontFamily:"var(--mono)",fontSize:9,color:"var(--text3)"}}>{k}</span>
+              <span style={{fontFamily:"var(--mono)",fontSize:9,color:"#555"}}>{v}</span>
+            </div>
+          ))}
+          <hr className="hr"/>
+          <span className="label">Gradient</span>
+          {["R1","R2","R3","R4"].map((p,pi)=>{
+            const i=pi*2;
+            const edges=[["ab","dc"],["dc","ef"],["ef","gh"],["gh","ji"]][pi];
+            return(
+              <div key={p} style={{marginBottom:10}}>
+                <div style={{fontFamily:"var(--mono)",fontSize:7,color:"#2a2a2a",letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:4}}>{p}</div>
+                {[0,1].map(j=>(
+                  <div key={j} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <div style={{width:12,height:12,borderRadius:3,background:spec.gradient[p][edges[j]],border:"1px solid #222",flexShrink:0}}/>
+                    <span style={{fontFamily:"var(--mono)",fontSize:8,color:"var(--text3)",flex:1}}>[{edges[j]}]</span>
+                    <span style={{fontFamily:"var(--mono)",fontSize:9,color:"#555"}}>{(spec.gradient[p][edges[j]]||"").toUpperCase()}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════
+function App(){
+  const mountRef    = useRef(null);
+  const groupRef    = useRef(null);
+  const sceneRef    = useRef(null);
+  const rendererRef = useRef(null);
+  const cameraRef   = useRef(null);
+  const rafRef      = useRef(null);
+  const drag        = useRef({on:false,x:0,y:0,pinchD:0});
+  const rot         = useRef({x:0.35,y:-0.65});
+  const mouseRef    = useRef({x:0,y:0});
+  const animRef     = useRef({on:false,mouse:false,speed:0.4,t:0,lastT:null});
+  const aniRanges   = useRef({spacing:[1.5,4.5],angle:[5,80],width:[4.3,5.2],length:[2.7,3.25]});
+  const params      = useRef({});
+
+  // Shape
+  const [spacing,    setSpacing]    = useState(3.0);
+  const [length,     setLength]     = useState(2.90);
+  const [plateWidth, setPlateWidth] = useState(4.80);
+  const [angle,      setAngle]      = useState(38);
+  const [radius,     setRadius]     = useState(0.50);
+  const [rotX,       setRotX]       = useState(20);
+  const [rotY,       setRotY]       = useState(-37);
+  const [rotZ,       setRotZ]       = useState(0);
+  const [bg,         setBg]         = useState("black");
+
+  // Colors
+  const [panelColors, setPanelColors] = useState(PRESETS[0].colors);
+
+  // Animation
+  const [animOn,    setAnimOn]    = useState(false);
+  const [mouseOn,   setMouseOn]   = useState(false);
+  const [animSpeed, setAnimSpeed] = useState(0.4);
+  const [aniSpacing, setAniSpacing] = useState([1.5,4.5]);
+  const [aniAngle,   setAniAngle]   = useState([5,80]);
+  const [aniWidth,   setAniWidth]   = useState([4.3,5.2]);
+  const [aniLength,  setAniLength]  = useState([2.7,3.25]);
+
+  // UI
+  const [tab,        setTab]        = useState("colors");
+  const [sheetOpen,  setSheetOpen]  = useState(false);
+  const [exportImg,  setExportImg]  = useState(null);
+  const [spec,       setSpec]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+
+  // Sync anim ranges
+  useEffect(()=>{ aniRanges.current.spacing=aniSpacing; },[aniSpacing]);
+  useEffect(()=>{ aniRanges.current.angle=aniAngle; },[aniAngle]);
+  useEffect(()=>{ aniRanges.current.width=aniWidth; },[aniWidth]);
+  useEffect(()=>{ aniRanges.current.length=aniLength; },[aniLength]);
+
+  // Build params + rebuild shape
+  useEffect(()=>{
+    params.current={spacing,length,plateWidth,angle,radius,panelColors};
+    if(groupRef.current&&!animRef.current.on) buildShape(groupRef.current,params.current);
+  },[spacing,length,plateWidth,angle,radius,panelColors]);
+
+  // Rotation sliders → group
+  useEffect(()=>{
+    const rx=rotX*Math.PI/180,ry=rotY*Math.PI/180;
+    rot.current={x:rx,y:ry};
+    if(groupRef.current&&!animRef.current.on){groupRef.current.rotation.x=rx;groupRef.current.rotation.y=ry;}
+  },[rotX,rotY]);
+  useEffect(()=>{
+    if(groupRef.current)groupRef.current.rotation.z=rotZ*Math.PI/180;
+  },[rotZ]);
+
+  // Background
+  useEffect(()=>{
+    if(sceneRef.current)sceneRef.current.background=new THREE.Color(BG_OPTS.find(o=>o.value===bg).color);
+  },[bg]);
+
+  // Presets
+  const applyPreset=useCallback(p=>{setPanelColors(p.colors);setBg(p.bg);},[]);
+
+  // Scene init
+  useEffect(()=>{
+    const el=mountRef.current;
+    const scene=new THREE.Scene();
+    scene.background=new THREE.Color(0x080808);
+    sceneRef.current=scene;
+    const camera=new THREE.PerspectiveCamera(36,el.clientWidth/el.clientHeight,0.1,100);
+    camera.position.set(0,1,15);camera.lookAt(0,0,0);
+    cameraRef.current=camera;
+    const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(el.clientWidth,el.clientHeight);
+    el.appendChild(renderer.domElement);
+    rendererRef.current=renderer;
+    const group=new THREE.Group();
+    group.rotation.x=rot.current.x;group.rotation.y=rot.current.y;
+    scene.add(group);groupRef.current=group;
+    buildShape(group,params.current);
+    setLoading(false);
+
+    const lerp=(a,b,t)=>a+(b-a)*t;
+    const wave=(t,f,p)=>(Math.sin(t*f+p)+1)/2;
+    let colorPh=0;
+
+    const hexLerp=(a,b,f)=>{
+      const rA=parseInt(a.slice(1,3),16),gA=parseInt(a.slice(3,5),16),bA=parseInt(a.slice(5,7),16);
+      const rB=parseInt(b.slice(1,3),16),gB=parseInt(b.slice(3,5),16),bB=parseInt(b.slice(5,7),16);
+      return '#'+[Math.round(rA+f*(rB-rA)),Math.round(gA+f*(gB-gA)),Math.round(bA+f*(bB-bA))].map(v=>v.toString(16).padStart(2,'0')).join('');
+    };
+    const pick=offset=>{
+      const idx=(colorPh+offset)%ANIM_PALETTE.length;
+      const i0=Math.floor(idx)%ANIM_PALETTE.length;
+      const i1=(i0+1)%ANIM_PALETTE.length;
+      return hexLerp(ANIM_PALETTE[i0],ANIM_PALETTE[i1],idx-Math.floor(idx));
+    };
+
+    const animate=(ts)=>{
+      rafRef.current=requestAnimationFrame(animate);
+      const anim=animRef.current;
+      if(anim.on){
+        if(anim.lastT===null)anim.lastT=ts;
+        const dt=(ts-anim.lastT)/1000;anim.lastT=ts;anim.t+=dt*anim.speed;colorPh+=dt*anim.speed*0.15;
+        const t=anim.t,R=aniRanges.current;
+        const newSpacing=lerp(R.spacing[0],R.spacing[1],wave(t,0.41,0));
+        const newAngle=lerp(R.angle[0],R.angle[1],wave(t,0.27,2.1));
+        const newWidth=lerp(R.width[0],R.width[1],wave(t,0.33,4.5));
+        const newLength=lerp(R.length[0],R.length[1],wave(t,0.19,1.3));
+        const mx=anim.mouse?mouseRef.current.x*0.4:0;
+        const my=anim.mouse?mouseRef.current.y*0.3:0;
+        if(group){
+          group.rotation.x=rot.current.x+Math.sin(t*0.11)*0.12+my;
+          group.rotation.y=rot.current.y+Math.sin(t*0.08)*0.18+mx;
+        }
+        buildShape(group,{...params.current,spacing:newSpacing,angle:newAngle,
+          plateWidth:newWidth,length:newLength,
+          panelColors:[pick(0),pick(1.2),pick(1.2),pick(2.5),pick(2.5),pick(3.8),pick(3.8),pick(5.1)]});
+      } else {
+        anim.lastT=null;
+        if(anim.mouse&&group){
+          group.rotation.x=rot.current.x+mouseRef.current.y*0.35;
+          group.rotation.y=rot.current.y+mouseRef.current.x*0.5;
+        } else if(group&&!drag.current.on){
+          group.rotation.x=rot.current.x;group.rotation.y=rot.current.y;
+        }
+      }
+      renderer.render(scene,camera);
+    };
+    animate(0);
+
+    const onResize=()=>{camera.aspect=el.clientWidth/el.clientHeight;camera.updateProjectionMatrix();renderer.setSize(el.clientWidth,el.clientHeight);};
+    const onWheel=e=>{e.preventDefault();camera.position.z=Math.max(3,Math.min(40,camera.position.z+e.deltaY*0.02));};
+    const onMouseMove=e=>{if(!animRef.current.mouse)return;const r=el.getBoundingClientRect();mouseRef.current.x=((e.clientX-r.left)/r.width-0.5)*2;mouseRef.current.y=((e.clientY-r.top)/r.height-0.5)*2;};
+    window.addEventListener("resize",onResize);
+    el.addEventListener("wheel",onWheel,{passive:false});
+    el.addEventListener("mousemove",onMouseMove);
+    return()=>{cancelAnimationFrame(rafRef.current);window.removeEventListener("resize",onResize);el.removeEventListener("wheel",onWheel);el.removeEventListener("mousemove",onMouseMove);renderer.dispose();el.removeChild(renderer.domElement);};
+  },[]);
+
+  // Drag rotate
+  const onPointerDown=useCallback(e=>{
+    if(e.touches&&e.touches.length===2){
+      drag.current.pinchD=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      return;
+    }
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    const cy=e.touches?e.touches[0].clientY:e.clientY;
+    drag.current={on:true,x:cx,y:cy,pinchD:0};
+  },[]);
+  const onPointerMove=useCallback(e=>{
+    if(e.touches&&e.touches.length===2){
+      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      if(drag.current.pinchD>0&&cameraRef.current){
+        const delta=(drag.current.pinchD-d)*0.05;
+        cameraRef.current.position.z=Math.max(3,Math.min(40,cameraRef.current.position.z+delta));
+      }
+      drag.current.pinchD=d;
+      return;
+    }
+    if(!drag.current.on)return;
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    const cy=e.touches?e.touches[0].clientY:e.clientY;
+    rot.current.y+=(cx-drag.current.x)*0.007;
+    rot.current.x+=(cy-drag.current.y)*0.007;
+    drag.current={on:true,x:cx,y:cy,pinchD:0};
+    if(groupRef.current&&!animRef.current.on){
+      groupRef.current.rotation.x=rot.current.x;groupRef.current.rotation.y=rot.current.y;
+    }
+    setRotX(Math.round(rot.current.x*180/Math.PI));
+    setRotY(Math.round(rot.current.y*180/Math.PI));
+  },[]);
+  const onPointerUp=useCallback(()=>{drag.current.on=false;},[]);
+
+  // Export
+  const doExport=useCallback(()=>{
+    const r=rendererRef.current;if(!r||!sceneRef.current||!cameraRef.current)return;
+    r.render(sceneRef.current,cameraRef.current);
+    const canvas=r.domElement,w=canvas.width,h=canvas.height;
+    const png=canvas.toDataURL("image/png");
+    const toBlob=d=>{const[hdr,dat]=d.split(",");const mime=hdr.match(/:(.*?);/)[1];const byt=atob(dat);const arr=new Uint8Array(byt.length);for(let i=0;i<byt.length;i++)arr[i]=byt.charCodeAt(i);return new Blob([arr],{type:mime});};
+    const pngUrl=URL.createObjectURL(toBlob(png));
+    const [cAB,cDC,cDC2,cEF,cEF2,cGH,cGH2,cJI]=panelColors;
+    const specObj={generated:new Date().toISOString(),shape:{spacing,length,plateWidth,angle,radius},rotation:{x:Math.round(rotX),y:Math.round(rotY),z:Math.round(rotZ)},gradient:{R1:{ab:cAB,dc:cDC},R2:{dc:cDC2,ef:cEF},R3:{ef:cEF2,gh:cGH},R4:{gh:cGH2,ji:cJI}},background:bg};
+    const svgStr=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}"><image width="${w}" height="${h}" xlink:href="${png}"/></svg>`;
+    const svgUrl=URL.createObjectURL(new Blob([svgStr],{type:"image/svg+xml"}));
+    const jsonUrl=URL.createObjectURL(new Blob([JSON.stringify(specObj,null,2)],{type:"application/json"}));
+    setExportImg({png,pngUrl,svgUrl,jsonUrl});setSpec(specObj);
+    setTimeout(()=>{URL.revokeObjectURL(pngUrl);URL.revokeObjectURL(svgUrl);URL.revokeObjectURL(jsonUrl);},60000);
+  },[spacing,length,plateWidth,angle,radius,rotX,rotY,rotZ,panelColors,bg]);
+
+  const TABS=[{id:"colors",label:"Colors"},{id:"shape",label:"Shape"},{id:"anim",label:"Motion"},{id:"export",label:"Export"}];
+  const isMobile=window.innerWidth<768;
+
+  return(
+    <>
+      {loading&&(
+        <div className="loading">
+          <div className="loading-logo">Hey<b>Max</b></div>
+          <div className="loading-bar"><div className="loading-fill" style={{width:"80%"}}/></div>
+          <div className="loading-text">Loading generator&hellip;</div>
+        </div>
+      )}
+
+      {/* Canvas */}
+      <div className="canvas-wrap"
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp}
+        onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}
+        style={{cursor:"crosshair",userSelect:"none",touchAction:"none"}}>
+        <div ref={mountRef} style={{width:"100%",height:"100%"}}/>
+        <div className="canvas-info">
+          {animOn&&<><span className="anim-dot"/></>}
+          <span className="canvas-badge">HeyMax · Logo Generator</span>
+        </div>
+      </div>
+
+      {/* Panel */}
+      <div className="sheet" style={isMobile?{height:sheetOpen?`${window.innerHeight*0.6}px`:"var(--panel-h)"}:{}}>
+        {isMobile&&(
+          <div className="sheet-handle" onClick={()=>setSheetOpen(v=>!v)}>
+            <div className="sheet-pill"/>
+          </div>
+        )}
+        <div className="tabs">
+          {TABS.map(t=>(
+            <button key={t.id} className={`tab${tab===t.id?" active":""}`} onClick={()=>{setTab(t.id);if(isMobile)setSheetOpen(true);}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="tab-content">
+          {tab==="colors"&&<>
+            <PresetsTab panelColors={panelColors} onApply={applyPreset} bg={bg} onBg={setBg}/>
+            <hr className="hr"/>
+            <span className="label">Panel Colours</span>
+            <ColorEditor panelColors={panelColors} onChange={setPanelColors}/>
+          </>}
+          {tab==="shape"&&<ShapeTab spacing={spacing} setSpacing={setSpacing} length={length} setLength={setLength}
+            plateWidth={plateWidth} setPlateWidth={setPlateWidth} angle={angle} setAngle={setAngle}
+            radius={radius} setRadius={setRadius} rotX={rotX} setRotX={setRotX} rotY={rotY} setRotY={setRotY} rotZ={rotZ} setRotZ={setRotZ}/>}
+          {tab==="anim"&&<AnimTab animOn={animOn} setAnimOn={setAnimOn} mouseOn={mouseOn} setMouseOn={setMouseOn}
+            animSpeed={animSpeed} setAnimSpeed={setAnimSpeed} animRef={animRef}
+            aniSpacing={aniSpacing} setAniSpacing={setAniSpacing} aniAngle={aniAngle} setAniAngle={setAniAngle}
+            aniWidth={aniWidth} setAniWidth={setAniWidth} aniLength={aniLength} setAniLength={setAniLength}/>}
+          {tab==="export"&&<ExportTab onExport={doExport} exportImg={exportImg} onCloseExport={()=>setExportImg(null)} spec={spec}/>}
+        </div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
